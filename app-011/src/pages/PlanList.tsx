@@ -60,6 +60,9 @@ export default function PlanList() {
                     <Link className="btn btn-secondary" to={`/plan/${plan.id}/bom`}>
                       材料
                     </Link>
+                    <Link className="btn btn-secondary" to={`/plan/${plan.id}/walkthrough`}>
+                      交底确认{plan.sheet ? `（V${plan.sheet.currentVersion}）` : ''}
+                    </Link>
                     <button
                       className="btn btn-danger"
                       onClick={() => deletePlan(plan.id)}

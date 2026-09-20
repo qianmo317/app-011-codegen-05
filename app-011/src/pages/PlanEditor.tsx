@@ -97,6 +97,9 @@ export default function PlanEditor() {
         <Link to={`/plan/${id}/walls`} className="tab">
           墙面点位
         </Link>
+        <Link to={`/plan/${id}/walkthrough`} className="tab">
+          交底确认
+        </Link>
         <Link to={`/plan/${id}/bom`} className="tab">
           材料清单
         </Link>

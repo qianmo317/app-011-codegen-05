@@ -11,6 +11,7 @@ export default function WallEditor() {
 
   const [roomId, setRoomId] = useState('');
   const [wallIndex, setWallIndex] = useState('0');
+  const [label, setLabel] = useState('');
   const [xMm, setXMm] = useState('0');
   const [heightMm, setHeightMm] = useState('300');
   const [kind, setKind] = useState<Outlet['kind']>('socket');
@@ -25,16 +26,23 @@ export default function WallEditor() {
     const outlet: Outlet = {
       id: Math.random().toString(36).slice(2),
       wallKey,
+      label: label.trim() || undefined,
       xMm: parseInt(xMm) || 0,
       heightMm: parseInt(heightMm) || 0,
       kind,
       circuit: circuit || undefined,
     };
     addOutlet(plan.id, outlet);
+    setLabel('');
   };
 
   const wallOutlets = plan?.outlets.filter((o) => o.wallKey === wallKey) || [];
   const allOutlets = plan?.outlets || [];
+  const lockedIds = new Set(
+    plan?.sheet?.rows
+      .filter((r) => r.confirmation.worker || r.confirmation.owner)
+      .map((r) => r.outletId) ?? []
+  );
 
   const outletCounts = {
     socket: allOutlets.filter((o) => o.kind === 'socket').length,
@@ -59,6 +67,9 @@ export default function WallEditor() {
         <Link to={`/plan/${id}/walls`} className="tab active">
           墙面点位
         </Link>
+        <Link to={`/plan/${id}/walkthrough`} className="tab">
+          交底确认
+        </Link>
         <Link to={`/plan/${id}/bom`} className="tab">
           材料清单
         </Link>
@@ -80,7 +91,13 @@ export default function WallEditor() {
         <div style={{ width: 320 }}>
           <div className="card">
             <h3 style={{ marginBottom: 12, fontSize: 16 }}>添加点位</h3>
-            <div className="form-group">
+            {plan.sheet && (
+              <div className="form-error" style={{ marginBottom: 12 }}>
+                交底确认单已出第 {plan.sheet.currentVersion} 版，不能再直接加点位——
+                请到 <a href={`/plan/${plan.id}/walkthrough`}>交底确认</a> 页提「新增变更」。
+              </div>
+            )}
+            <div className="form-group" style={{ opacity: plan.sheet ? 0.5 : 1, pointerEvents: plan.sheet ? 'none' : 'auto' }}>
               <label>房间</label>
               <select value={roomId} onChange={(e) => setRoomId(e.target.value)}>
                 <option value="">选择房间</option>
@@ -93,10 +110,14 @@ export default function WallEditor() {
             </div>
 
             {selectedRoom && (
-              <>
+              <div style={{ opacity: plan.sheet ? 0.5 : 1 }}>
                 <div className="form-group">
                   <label>墙面</label>
-                  <select value={wallIndex} onChange={(e) => setWallIndex(e.target.value)}>
+                  <select
+                    value={wallIndex}
+                    onChange={(e) => setWallIndex(e.target.value)}
+                    disabled={!!plan.sheet}
+                  >
                     {wallSegs.map((s, i) => (
                       <option key={i} value={i}>
                         墙{i + 1} ({formatMm(s.lengthMm)})
@@ -106,8 +127,13 @@ export default function WallEditor() {
                 </div>
 
                 <div className="form-group">
+                  <label>点位名称（交底单上显示）</label>
+                  <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="如：沙发左插座" disabled={!!plan.sheet} />
+                </div>
+
+                <div className="form-group">
                   <label>类型</label>
-                  <select value={kind} onChange={(e) => setKind(e.target.value as Outlet['kind'])}>
+                  <select value={kind} onChange={(e) => setKind(e.target.value as Outlet['kind'])} disabled={!!plan.sheet}>
                     <option value="socket">插座</option>
                     <option value="switch">开关</option>
                     <option value="net">网口</option>
@@ -118,49 +144,59 @@ export default function WallEditor() {
 
                 <div className="form-group">
                   <label>距墙左端 (mm)</label>
-                  <input value={xMm} onChange={(e) => setXMm(e.target.value)} />
+                  <input value={xMm} onChange={(e) => setXMm(e.target.value)} disabled={!!plan.sheet} />
                 </div>
                 <div className="form-group">
                   <label>距地高度 (mm)</label>
-                  <input value={heightMm} onChange={(e) => setHeightMm(e.target.value)} />
+                  <input value={heightMm} onChange={(e) => setHeightMm(e.target.value)} disabled={!!plan.sheet} />
                 </div>
                 <div className="form-group">
                   <label>回路 (可选)</label>
-                  <input value={circuit} onChange={(e) => setCircuit(e.target.value)} placeholder="如: L1" />
+                  <input value={circuit} onChange={(e) => setCircuit(e.target.value)} placeholder="如: L1" disabled={!!plan.sheet} />
                 </div>
 
-                <button className="btn btn-primary" onClick={handleAdd} style={{ width: '100%' }}>
+                <button className="btn btn-primary" onClick={handleAdd} style={{ width: '100%' }} disabled={!!plan.sheet}>
                   添加点位
                 </button>
-              </>
+              </div>
             )}
           </div>
 
           {wallOutlets.length > 0 && (
             <div className="card" style={{ marginTop: 16 }}>
               <h4 style={{ fontSize: 14, marginBottom: 8 }}>当前墙面点位</h4>
-              {wallOutlets.map((o) => (
-                <div
-                  key={o.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '6px 0',
-                    borderBottom: '1px solid #ecf0f1',
-                    fontSize: 13,
-                  }}
-                >
-                  <span>
-                    {o.kind === 'socket' ? '插座' : o.kind === 'switch' ? '开关' : o.kind === 'net' ? '网口' : o.kind === 'light' ? '灯位' : '水口'}
-                    {' '}@{formatMm(o.xMm)} 高{formatMm(o.heightMm)}
-                    {o.circuit ? ` (${o.circuit})` : ''}
-                  </span>
-                  <button className="btn btn-danger" onClick={() => deleteOutlet(plan.id, o.id)}>
-                    删除
-                  </button>
-                </div>
-              ))}
+              {wallOutlets.map((o) => {
+                const locked = lockedIds.has(o.id);
+                return (
+                  <div
+                    key={o.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '6px 0',
+                      borderBottom: '1px solid #ecf0f1',
+                      fontSize: 13,
+                    }}
+                  >
+                    <span>
+                      {o.label ? `${o.label} ` : ''}
+                      {o.kind === 'socket' ? '插座' : o.kind === 'switch' ? '开关' : o.kind === 'net' ? '网口' : o.kind === 'light' ? '灯位' : '水口'}
+                      {' '}@{formatMm(o.xMm)} 高{formatMm(o.heightMm)}
+                      {o.circuit ? ` (${o.circuit})` : ''}
+                      {locked && <span className="badge badge-warn" style={{ marginLeft: 6 }}>已签字锁定</span>}
+                    </span>
+                    <button
+                      className="btn btn-danger"
+                      disabled={locked || !!plan.sheet}
+                      title={locked ? '已签字点位不能原地删，请到交底确认页提变更' : plan.sheet ? '确认单已建档，删除请走变更单' : '删除'}
+                      onClick={() => deleteOutlet(plan.id, o.id)}
+                    >
+                      删除
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
