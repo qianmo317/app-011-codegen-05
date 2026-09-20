@@ -2,6 +2,7 @@ import { Routes, Route, Link } from 'react-router-dom'
 import PlanList from './pages/PlanList'
 import PlanEditor from './pages/PlanEditor'
 import WallEditor from './pages/WallEditor'
+import Signoff from './pages/Signoff'
 import BOM from './pages/BOM'
 import PrintView from './pages/PrintView'
 
@@ -18,6 +19,7 @@ function App() {
           <Route path="/" element={<PlanList />} />
           <Route path="/plan/:id" element={<PlanEditor />} />
           <Route path="/plan/:id/walls" element={<WallEditor />} />
+          <Route path="/plan/:id/signoff" element={<Signoff />} />
           <Route path="/plan/:id/bom" element={<BOM />} />
           <Route path="/plan/:id/print" element={<PrintView />} />
         </Routes>

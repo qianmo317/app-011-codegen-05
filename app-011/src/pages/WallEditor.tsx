@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useStore } from '../store';
 import type { Outlet } from '../types';
 import { getWallSegments, formatMm } from '../utils/geometry';
+import { lockedOutletIds } from '../utils/signoff';
 
 export default function WallEditor() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +16,7 @@ export default function WallEditor() {
   const [heightMm, setHeightMm] = useState('300');
   const [kind, setKind] = useState<Outlet['kind']>('socket');
   const [circuit, setCircuit] = useState('');
+  const [name, setName] = useState('');
 
   const selectedRoom = plan?.rooms.find((r) => r.id === roomId);
   const wallSegs = selectedRoom ? getWallSegments(selectedRoom) : [];
@@ -29,12 +31,16 @@ export default function WallEditor() {
       heightMm: parseInt(heightMm) || 0,
       kind,
       circuit: circuit || undefined,
+      name: name.trim() || undefined,
     };
     addOutlet(plan.id, outlet);
+    setName('');
   };
 
   const wallOutlets = plan?.outlets.filter((o) => o.wallKey === wallKey) || [];
   const allOutlets = plan?.outlets || [];
+  const locked = plan ? lockedOutletIds(plan) : new Map<string, number>();
+  const sheetIssued = (plan?.sheets?.length ?? 0) > 0;
 
   const outletCounts = {
     socket: allOutlets.filter((o) => o.kind === 'socket').length,
@@ -58,6 +64,9 @@ export default function WallEditor() {
         </Link>
         <Link to={`/plan/${id}/walls`} className="tab active">
           墙面点位
+        </Link>
+        <Link to={`/plan/${id}/signoff`} className="tab">
+          交底确认
         </Link>
         <Link to={`/plan/${id}/bom`} className="tab">
           材料清单
@@ -117,6 +126,10 @@ export default function WallEditor() {
                 </div>
 
                 <div className="form-group">
+                  <label>名称 (可选)</label>
+                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="如: 电视墙插座" />
+                </div>
+                <div className="form-group">
                   <label>距墙左端 (mm)</label>
                   <input value={xMm} onChange={(e) => setXMm(e.target.value)} />
                 </div>
@@ -129,9 +142,17 @@ export default function WallEditor() {
                   <input value={circuit} onChange={(e) => setCircuit(e.target.value)} placeholder="如: L1" />
                 </div>
 
-                <button className="btn btn-primary" onClick={handleAdd} style={{ width: '100%' }}>
-                  添加点位
-                </button>
+                {sheetIssued ? (
+                  <div className="banner-history" style={{ marginBottom: 0 }}>
+                    已出具确认单，点位的增/改/删都要走
+                    <Link to={`/plan/${id}/signoff`}>变更单</Link>
+                    ，不能在这里直接加。
+                  </div>
+                ) : (
+                  <button className="btn btn-primary" onClick={handleAdd} style={{ width: '100%' }}>
+                    添加点位
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -139,28 +160,39 @@ export default function WallEditor() {
           {wallOutlets.length > 0 && (
             <div className="card" style={{ marginTop: 16 }}>
               <h4 style={{ fontSize: 14, marginBottom: 8 }}>当前墙面点位</h4>
-              {wallOutlets.map((o) => (
-                <div
-                  key={o.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '6px 0',
-                    borderBottom: '1px solid #ecf0f1',
-                    fontSize: 13,
-                  }}
-                >
-                  <span>
-                    {o.kind === 'socket' ? '插座' : o.kind === 'switch' ? '开关' : o.kind === 'net' ? '网口' : o.kind === 'light' ? '灯位' : '水口'}
-                    {' '}@{formatMm(o.xMm)} 高{formatMm(o.heightMm)}
-                    {o.circuit ? ` (${o.circuit})` : ''}
-                  </span>
-                  <button className="btn btn-danger" onClick={() => deleteOutlet(plan.id, o.id)}>
-                    删除
-                  </button>
-                </div>
-              ))}
+              {wallOutlets.map((o) => {
+                const lockedIn = locked.get(o.id);
+                return (
+                  <div
+                    key={o.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '6px 0',
+                      borderBottom: '1px solid #ecf0f1',
+                      fontSize: 13,
+                    }}
+                  >
+                    <span>
+                      {lockedIn != null && <span title={`已进入确认单V${lockedIn}，不能原地改`}>🔒 </span>}
+                      {o.name ? `${o.name} · ` : ''}
+                      {o.kind === 'socket' ? '插座' : o.kind === 'switch' ? '开关' : o.kind === 'net' ? '网口' : o.kind === 'light' ? '灯位' : '水口'}
+                      {' '}@{formatMm(o.xMm)} 高{formatMm(o.heightMm)}
+                      {o.circuit ? ` (${o.circuit})` : ''}
+                    </span>
+                    {lockedIn != null ? (
+                      <span style={{ fontSize: 12, color: '#999' }}>
+                        已进确认单V{lockedIn}，改动请走<Link to={`/plan/${id}/signoff`}>变更</Link>
+                      </span>
+                    ) : (
+                      <button className="btn btn-danger" onClick={() => deleteOutlet(plan.id, o.id)}>
+                        删除
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
